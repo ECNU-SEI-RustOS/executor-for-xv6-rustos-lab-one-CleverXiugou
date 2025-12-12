@@ -39,6 +39,7 @@ pub trait Syscall {
     fn sys_link(&mut self) -> SysResult;
     fn sys_mkdir(&mut self) -> SysResult;
     fn sys_close(&mut self) -> SysResult;
+    fn sys_trace(&mut self) -> SysResult;
 }
 
 impl Syscall for Proc {
@@ -496,6 +497,18 @@ impl Syscall for Proc {
         println!("[{}].close(fd={}), file={:?}", self.excl.lock().pid, fd, file);
 
         drop(file);
+        Ok(0)
+    }
+
+    fn sys_trace(&mut self) -> SysResult {
+        // 获取第一个参数，即 mask
+        let mask = self.arg_i32(0);
+        // 保存到当前进程的 trace_mask 中
+        self.data.get_mut().trace_mask = mask;
+        // 打印调试信息（可选，根据实验要求不需要，但方便调试）
+        #[cfg(feature = "trace_syscall")]
+        println!("[{}].trace(mask={})", self.excl.lock().pid, mask);
+        
         Ok(0)
     }
 }

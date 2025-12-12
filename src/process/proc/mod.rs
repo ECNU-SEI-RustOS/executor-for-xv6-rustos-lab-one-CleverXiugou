@@ -102,6 +102,7 @@ pub struct ProcData {
     pub pagetable: Option<Box<PageTable>>,
     /// 进程当前工作目录的 inode。
     pub cwd: Option<Inode>,
+    pub trace_mask: i32,
 }
 
 
@@ -116,6 +117,7 @@ impl ProcData {
             tf: ptr::null_mut(),
             pagetable: None,
             cwd: None,
+            trace_mask: 0,
         }
     }
 
@@ -520,6 +522,7 @@ impl Proc {
             19 => self.sys_link(),
             20 => self.sys_mkdir(),
             21 => self.sys_close(),
+            22 => self.sys_trace(),
             _ => {
                 panic!("unknown syscall num: {}", a7);
             }
@@ -528,6 +531,18 @@ impl Proc {
             Ok(ret) => ret,
             Err(()) => -1isize as usize,
         };
+
+        let trace_mask = self.data.get_mut().trace_mask;
+        // 检查掩码的第 a7 位是否为 1
+        if (trace_mask >> a7) & 1 != 0 {
+            let pid = self.excl.lock().pid;
+            let ret_val = tf.a0 as isize; // 将返回值转为有符号整数显示
+            if a7 < SYSCALL_NAMES.len() {
+                println!("{}: syscall {} -> {}", pid, SYSCALL_NAMES[a7], ret_val);
+            } else {
+                println!("{}: syscall unknown({}) -> {}", pid, a7, ret_val);
+            }
+        }
     }
 
     /// # 功能说明
@@ -690,6 +705,8 @@ impl Proc {
         
         // copy process name
         cdata.name.copy_from_slice(&pdata.name);
+
+        cdata.trace_mask = pdata.trace_mask;
 
         let cpid = cexcl.pid;
 
@@ -877,4 +894,7 @@ static INITCODE: [u8; 51] = [
     0x9d, 0x48, 0x73, 0x00, 0x00, 0x00, 0x89, 0x48, 0x73, 0x00, 0x00, 0x00, 0xef, 0xf0, 0xbf, 0xff,
     0x2f, 0x69, 0x6e, 0x69, 0x74, 0x00, 0x00, 0x01, 0x20, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
     0x00, 0x00, 0x00,
+];
+const SYSCALL_NAMES: [&str; 23] = [
+    "", "fork", "exit", "wait", "pipe", "read", "kill", "exec", "fstat", "chdir", "dup", "getpid", "sbrk", "sleep", "uptime", "open", "write", "mknod", "unlink", "link", "mkdir", "close", "trace"
 ];
