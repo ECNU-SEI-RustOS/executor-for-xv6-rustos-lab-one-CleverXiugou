@@ -164,7 +164,24 @@ impl Syscall for Proc {
             }
             if uarg == 0 {
                 match elf::load(self, &path, &argv[..i]) {
-                    Ok(ret) => result = Ok(ret),
+                    Ok(ret) => {
+                        result = Ok(ret);
+
+                        // 获取进程锁以查看 PID
+                        let guard = self.excl.lock();
+                        println!("DEBUG: exec success, pid = {}", guard.pid);
+                        if guard.pid == 0 {
+                            let data = self.data.get_mut();
+                            // 调用你刚才在 pagetable.rs 里写的 vm_print
+                            // 注意：如果你定义的 vm_print 没有参数，就用下面这一行：
+                            if let Some(pgt) = data.pagetable.as_ref() {
+                                pgt.vm_print();
+                            }
+                            // 如果你定义的 vm_print 需要 level 参数，请用：
+                            // data.pagetable.as_ref().unwrap().vm_print(0);
+                        }
+                        drop(guard);
+                    },
                     Err(s) => error = s,
                 }
                 break       

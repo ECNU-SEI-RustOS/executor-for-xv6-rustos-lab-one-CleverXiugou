@@ -915,6 +915,42 @@ impl PageTable {
             debug_assert_eq!(src, va.as_usize());
         }
     }
+
+    pub fn vm_print(&self) {
+        // 1. 打印根页表地址
+        println!("page table {:#x}", self as *const _ as usize);
+        // 2. 递归打印页表项
+        self.vm_print_recur(0);
+    }
+
+    fn vm_print_recur(&self, level: usize) {
+        for (i, pte) in self.data.iter().enumerate() {
+            // 只打印有效的页表项
+            if pte.is_valid() {
+                // 打印缩进：根据层级打印 ".."
+                // --- 修改开始：将 _ 改为 j ---
+                for j in 0..=level {
+                    print!("..");
+                    if j < level {
+                        print!(" ");
+                    }
+                }
+                // --- 修改结束 ---
+                
+                // 打印索引、PTE值、物理地址
+                let pa = pte.as_phys_addr().as_usize();
+                println!("{}: pte {:#x} pa {:#x}", i, pte.data, pa);
+
+                // 如果不是叶子节点（指向下一级页表），则递归打印
+                if !pte.is_leaf() {
+                    let child_pgt_ptr = pte.as_page_table();
+                    // SAFETY: pte 有效且非叶子，保证指向合法的下一级页表
+                    let child_pgt = unsafe { &*child_pgt_ptr };
+                    child_pgt.vm_print_recur(level + 1);
+                }
+            }
+        }
+    }
 }
 
 impl Drop for PageTable {
